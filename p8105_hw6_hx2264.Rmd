@@ -1,0 +1,159 @@
+---
+title: "p8105_hw6_hx2264"
+author: "Hongyao Xie"
+date: "November 20, 2018"
+output: html_document
+---
+
+## Problem 1
+
+```{r echo = FALSE}
+library(tidyverse)
+```
+
+**Create a city_state variable (e.g. “Baltimore, MD”), and a binary variable indicating whether the homicide is solved.**
+
+```{r}
+# Create a city_state variable
+homic <-  read_csv("./data/homicide-data.csv") %>% 
+  janitor::clean_names() %>% 
+  mutate(city_state = paste(city, state, sep = ",")) 
+
+# Create a binary variable
+homic$hmc_resolve <- ifelse(homic$disposition == "Closed by arrest", 1, 0)
+```
+
+**Omit cities Dallas, TX; Phoenix, AZ; Kansas City, MO; and Tulsa, AL. Modifiy victim_race to have categories white and non-white, with white as the reference category. Be sure that victim_age is numeric.**
+
+```{r}
+homic <- homic %>% 
+  filter(!city_state %in% c("Dallas,TX","Phoenix,AZ", "Kansas City,MO", "Tulsa,AL")) %>%
+  filter(victim_race != "Unkonwn") %>% 
+  mutate(victim_race = fct_relevel(ifelse(victim_race == "White", "white", "non-white"), "white")) %>%
+  mutate(victim_age = as.numeric(victim_age))
+```
+
+**For the city of Baltimore, MD, use the glm function to fit a logistic regression with resolved vs unresolved as the outcome and victim age, sex and race (as just defined) as predictors. Save the output of  glm as an R object; apply the broom::tidy to this object**
+
+```{r}
+baltm <- homic %>% 
+  filter(city_state == "Baltimore,MD")
+
+baltm_glm <- glm(hmc_resolve ~ victim_age + victim_sex + victim_race, data = baltm, family = binomial()) %>% 
+  broom::tidy()
+baltm_glm
+```
+
+**Obtain the estimate and confidence interval of the adjusted odds ratio for solving homicides comparing non-white victims to white victims keeping all other variables fixed**
+
+```{r}
+baltm_glm <- baltm_glm %>% 
+  mutate(or = exp(estimate),
+         confint_low = exp(estimate - std.error*1.96),
+         confint_up = exp(estimate + std.error*1.96)) %>% 
+  select(term, estimate, or, confint_low, confint_up) %>% 
+  knitr::kable(digits = 3)
+baltm_glm
+```
+
+Description here
+
+**Run glm for each of the cities in your dataset, and extract the adjusted odds ratio (and CI) for solving homicides comparing non-white victims to white victims**
+
+```{r}
+homic_city <- homic %>% 
+  group_by(city_state) %>% 
+  nest()
+
+homic_city$glm_model <- map(homic_city$data, ~broom::tidy(glm(hmc_resolve ~ victim_age + victim_sex + victim_race, data = .x, family = binomial()))) 
+
+homic_city <- homic_city %>% 
+  select(city_state, glm_model) %>% 
+  unnest() %>%
+  filter(term == "victim_racenon-white") %>% 
+  mutate(or = exp(estimate),
+         confint_low = exp(estimate - std.error*1.96),
+         confint_up = exp(estimate + std.error*1.96)) %>% 
+  select(city_state, term, estimate, or, confint_low, confint_up)
+
+```
+
+**Create a plot that shows the estimated ORs and CIs for each city. Organize cities according to estimated OR, and comment on the plot**
+
+```{r}
+homic_city_plot <- homic_city %>%
+  mutate(city_state = fct_reorder(city_state, or)) %>% 
+  ggplot(aes(x = city_state, y = or)) +
+  geom_point() +
+  geom_errorbar(mapping = aes(ymin = confint_low, ymax = confint_up)) + 
+  labs(
+    title = "The estimated odds ratio and confidence interval for solving homicides comparing non-white victims to white victims in each city",
+    x = "City, state",
+    y = "Odds ratio"
+  ) +
+  theme(axis.text.x = element_text(angle = 90, size = 8),
+        title = element_text(size = 6)) 
+
+homic_city_plot
+```
+
+## Problem 2
+
+```{r}
+bw <- read_csv("./data/birthweight.csv")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
