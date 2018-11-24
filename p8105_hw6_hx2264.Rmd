@@ -57,12 +57,14 @@ baltm_glm <- baltm_glm %>%
   mutate(or = exp(estimate),
          confint_low = exp(estimate - std.error*1.96),
          confint_up = exp(estimate + std.error*1.96)) %>% 
-  select(term, estimate, or, confint_low, confint_up) %>% 
-  knitr::kable(digits = 3)
+  dplyr::select(term, estimate, or, confint_low, confint_up) %>% 
+  knitr::kable(digits = 2)
 baltm_glm
 ```
 
-Description here
+The adjusted odds ratio for solving homicides comparing non-white victims to white victims 0.44, which indicates the odds of solving homicides with non-white victims is 0.44 times the odds of solving homicides with white victims.
+
+The 95% confidence interval is (0.31, 0.62), which means we are 95% confident that the true odds ratio falls in this interval.
 
 **Run glm for each of the cities in your dataset, and extract the adjusted odds ratio (and CI) for solving homicides comparing non-white victims to white victims**
 
@@ -74,14 +76,14 @@ homic_city <- homic %>%
 homic_city$glm_model <- map(homic_city$data, ~broom::tidy(glm(hmc_resolve ~ victim_age + victim_sex + victim_race, data = .x, family = binomial()))) 
 
 homic_city <- homic_city %>% 
-  select(city_state, glm_model) %>% 
+  dplyr::select(city_state, glm_model) %>% 
   unnest() %>%
   filter(term == "victim_racenon-white") %>% 
   mutate(or = exp(estimate),
          confint_low = exp(estimate - std.error*1.96),
          confint_up = exp(estimate + std.error*1.96)) %>% 
-  select(city_state, term, estimate, or, confint_low, confint_up)
-
+  dplyr::select(city_state, term, estimate, or, confint_low, confint_up)
+homic_city
 ```
 
 **Create a plot that shows the estimated ORs and CIs for each city. Organize cities according to estimated OR, and comment on the plot**
@@ -102,6 +104,9 @@ homic_city_plot <- homic_city %>%
 
 homic_city_plot
 ```
+
+Most cities have estimated odds ratio below 1, which implies in most cities the odds of solving homicides with non-white victims is lower than the odds of solving homicides with white victims.
+
 
 ## Problem 2
 
@@ -154,7 +159,6 @@ for (my_mthd in names(which_all) ) {
   axis(1,1:nrow(which_all[[my_mthd]]),rownames(which_all[[my_mthd]]))
   axis(2,1:ncol(which_all[[my_mthd]]),colnames(which_all[[my_mthd]]),las = 2)
 }
-?image
 ```
 
 **Describe your modeling process.**
@@ -172,7 +176,7 @@ bw_lm <- lm(bwt ~ smoken + ppbmi + gaweeks + delwt + blength + bhead, data = bw)
 summary(bw_lm)
 ```
 
-**show a plot of model residuals against fitted values – use add_predictions and add_residuals in making this plot**
+**Show a plot of model residuals against fitted values – use add_predictions and add_residuals in making this plot**
 
 ```{r}
 bw %>% 
@@ -210,26 +214,26 @@ bw_cv <- bw %>%
 cv_models_compare <- 
   bw_cv %>% 
    mutate(my_model = map(train, ~lm(bwt ~ smoken + ppbmi + gaweeks + delwt + blength + bhead, data = .)),
-         model_2 = map(train, ~lm(bwt ~ blength + gaweeks, data = .)),
-         model_3 = map(train, ~lm(bwt ~ bhead + blength + babysex + bhead*babysex + bhead*blength + blength*babysex + bhead*babysex*blength, data = .)))%>% 
+         model_1 = map(train, ~lm(bwt ~ blength + gaweeks, data = .)),
+         model_2 = map(train, ~lm(bwt ~ bhead + blength + babysex + bhead*babysex + bhead*blength + blength*babysex + bhead*babysex*blength, data = .)))%>% 
    mutate(rmse_my_model = map2_dbl(my_model, test, ~rmse(.x, .y)),
-         rmse_model_2 = map2_dbl(model_2, test, ~rmse(.x, .y)),
-         rmse_model_3 = map2_dbl(model_3, test, ~rmse(.x, .y)))
+         rmse_model_1 = map2_dbl(model_1, test, ~rmse(.x, .y)),
+         rmse_model_2 = map2_dbl(model_2, test, ~rmse(.x, .y)))
 
-cv_rmse_compare %>% 
-  gather(key = model, value = rmse, rmse_my_model:rmse_model_3) %>% 
+cv_models_compare %>% 
+  dplyr::select(starts_with('rmse')) %>% 
+  gather(key = model, value = rmse, rmse_my_model:rmse_model_2) %>% 
   mutate(model = str_replace(model, "rmse_", '')) %>% 
   ggplot(aes(x = model, y = rmse)) +
   geom_violin() + 
   labs(
      title = "Prediction error distribution for each candidate model",
-     x = "RMSE",
-     y = "Model"
+     x = "Model",
+     y = "RMSE"
    )
 ```
 
-
-
+As we can see from the violin plot, my model has the lowest RMSE and the model 1 has the highest RMSE, which implies my model and model 2 do a better job regarding prediction accuracy than model 1. This makes sense because model 1 only includes two variables(length at birth and gestational age) to predict birth weight, which does not consider other factors that have significant effect on birth weight as well.
 
 
 
