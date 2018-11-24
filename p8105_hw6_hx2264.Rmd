@@ -9,6 +9,12 @@ output: html_document
 
 ```{r echo = FALSE}
 library(tidyverse)
+library(gridExtra)
+library(HH)
+library(leaps)
+library(ISLR)
+library(glmnet)
+library(modelr)
 ```
 
 **Create a city_state variable (e.g. “Baltimore, MD”), and a binary variable indicating whether the homicide is solved.**
@@ -100,15 +106,127 @@ homic_city_plot
 ## Problem 2
 
 ```{r}
-bw <- read_csv("./data/birthweight.csv")
+# Load data and clean up NAs, convert some variables from numeric to factor
+bw <- read_csv("./data/birthweight.csv") %>% 
+  janitor::clean_names() %>% 
+  na.omit() %>% 
+  mutate(babysex = as.factor(babysex),
+         frace = as.factor(frace),
+         malform = as.factor(malform),
+         mrace = as.factor(mrace))
 ```
 
+**Propose a regression model for birthweight.**
+
+```{r}
+# A function to compare some criterias for model size selection and variable membership
+# Use exhaustive/backward/forward/sequential replacement methods to choose optimal model size
+summary_metrics <- NULL
+which_all <- list()
+for (my_mthd in c("exhaustive", "backward", "forward", "seqrep") ) {
+  rs_res <- regsubsets(bwt~.,bw,method = my_mthd,nvmax = 19)
+  summ_res <- summary(rs_res)
+  which_all[[my_mthd]] <- summ_res$which
+  for (metric_name in c("rsq","rss","adjr2","cp","bic") ) {
+    summary_metrics <- rbind(summary_metrics,
+      data.frame(method = my_mthd,metric = metric_name,
+                nvars = 1:length(summ_res[[metric_name]]),
+                value = summ_res[[metric_name]]))
+  }
+}
+
+# Plot R-square/adjusted R-square/RSS/Cp/BIC value to choose optimal model size
+ggplot(summary_metrics,aes(x = nvars,y = value,shape = method, colour = method)) + 
+  geom_path() + 
+  geom_point() + 
+  facet_wrap(~metric,scales = "free") +   
+  theme(legend.position = "top")
+
+old.par <- par(mfrow = c(2,2),ps = 16,mar = c(5,7,2,1))
+
+# Plot variable memberships for each model selection method
+for (my_mthd in names(which_all) ) {
+  image(1:nrow(which_all[[my_mthd]]),
+        1:ncol(which_all[[my_mthd]]),
+        which_all[[my_mthd]],xlab = "N(vars)",ylab = "",
+        xaxt = "n",yaxt = "n",breaks = c(-0.5,0.5,1.5),
+        col = c("white","gray"),main = my_mthd)
+  axis(1,1:nrow(which_all[[my_mthd]]),rownames(which_all[[my_mthd]]))
+  axis(2,1:ncol(which_all[[my_mthd]]),colnames(which_all[[my_mthd]]),las = 2)
+}
+?image
+```
+
+**Describe your modeling process.**
+
+Here I used regsubsets function from leaps packages. This function selected models by exhaustive search, forward or backward stepwise, or sequential replacement once specified. I selected out R-square/adjusted R-square/RSS/Cp/BIC values for each model size and made ggplot to visualize the values. After visualization, we can see when variables are 8, the model tends to be "optimal" (to achieve bias/variance balance).
+
+Then we want to know which 8 variables were selected by the four methods from regsubsets function. I used image function to create a grid of rectagle plots to indicate whether each variable was included or not. After all these steps, we can see the variable memberships for each method. 
+
+Finally, we chose smoken, ppbmi, gaweeks, delwt, blength, bhead for our model. Although we see specific mother race and father race (mrace = 2 and frace = 4) also had significant influence on birth weight from model selection process, we did not include these two variables here, since other levels of mrace and frace didn't show significant differences.
 
 
+```{r}
+# Final model: variable = 6, including smoken, ppbmi, gaweeks, delwt, blength, bhead
+bw_lm <- lm(bwt ~ smoken + ppbmi + gaweeks + delwt + blength + bhead, data = bw)
+summary(bw_lm)
+```
 
+**show a plot of model residuals against fitted values – use add_predictions and add_residuals in making this plot**
 
+```{r}
+bw %>% 
+  add_residuals(bw_lm) %>% 
+  add_predictions(bw_lm) %>% 
+  ggplot(aes(x = pred, y = resid)) + 
+  geom_point() +
+  labs(
+     title = "Model residuals against fitted values",
+     x = "Fitted values",
+     y = "Residuals"
+   )
+```
 
+**Compare your model to two others**
 
+```{r}
+# One using length at birth and gestational age as predictors (main effects only)
+bw_model1 <- lm(bwt ~ blength + gaweeks, data = bw)
+summary(bw_model1)
+```
+
+```{r}
+# One using head circumference, length, sex, and all interactions (including the three-way interaction) between these
+bw_model2 <- lm(bwt ~ bhead + blength + babysex + bhead*babysex + bhead*blength + blength*babysex + bhead*babysex*blength, data = bw)
+summary(bw_model2)
+```
+
+**Make this comparison in terms of the cross-validated prediction error**
+
+```{r}
+bw_cv <- bw %>% 
+  crossv_mc(100)
+
+cv_models_compare <- 
+  bw_cv %>% 
+   mutate(my_model = map(train, ~lm(bwt ~ smoken + ppbmi + gaweeks + delwt + blength + bhead, data = .)),
+         model_2 = map(train, ~lm(bwt ~ blength + gaweeks, data = .)),
+         model_3 = map(train, ~lm(bwt ~ bhead + blength + babysex + bhead*babysex + bhead*blength + blength*babysex + bhead*babysex*blength, data = .)))%>% 
+   mutate(rmse_my_model = map2_dbl(my_model, test, ~rmse(.x, .y)),
+         rmse_model_2 = map2_dbl(model_2, test, ~rmse(.x, .y)),
+         rmse_model_3 = map2_dbl(model_3, test, ~rmse(.x, .y)))
+
+cv_rmse_compare %>% 
+  gather(key = model, value = rmse, rmse_my_model:rmse_model_3) %>% 
+  mutate(model = str_replace(model, "rmse_", '')) %>% 
+  ggplot(aes(x = model, y = rmse)) +
+  geom_violin() + 
+  labs(
+     title = "Prediction error distribution for each candidate model",
+     x = "RMSE",
+     y = "Model"
+   )
+```
 
 
 
