@@ -2,7 +2,7 @@
 title: "p8105_hw6_hx2264"
 author: "Hongyao Xie"
 date: "November 20, 2018"
-output: html_document
+output: github_document
 ---
 
 ## Problem 1
@@ -129,7 +129,7 @@ bw <- read_csv("./data/birthweight.csv") %>%
 summary_metrics <- NULL
 which_all <- list()
 for (my_mthd in c("exhaustive", "backward", "forward", "seqrep") ) {
-  rs_res <- regsubsets(bwt~.,bw,method = my_mthd,nvmax = 19)
+  rs_res <- regsubsets(bwt ~ .,bw,method = my_mthd,nvmax = 19)
   summ_res <- summary(rs_res)
   which_all[[my_mthd]] <- summ_res$which
   for (metric_name in c("rsq","rss","adjr2","cp","bic") ) {
@@ -144,7 +144,7 @@ for (my_mthd in c("exhaustive", "backward", "forward", "seqrep") ) {
 ggplot(summary_metrics,aes(x = nvars,y = value,shape = method, colour = method)) + 
   geom_path() + 
   geom_point() + 
-  facet_wrap(~metric,scales = "free") +   
+  facet_wrap(~ metric,scales = "free") +   
   theme(legend.position = "top")
 
 old.par <- par(mfrow = c(2,2),ps = 16,mar = c(5,7,2,1))
