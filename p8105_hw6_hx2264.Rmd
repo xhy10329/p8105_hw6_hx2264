@@ -167,7 +167,7 @@ Here I used regsubsets function from leaps packages. This function selected mode
 
 Then we want to know which 8 variables were selected by the four methods from regsubsets function. I used image function to create a grid of rectagle plots to indicate whether each variable was included or not. After all these steps, we can see the variable memberships for each method. 
 
-Finally, we chose smoken, ppbmi, gaweeks, delwt, blength, bhead for our model. Although we see specific mother race and father race (mrace = 2 and frace = 4) also had significant influence on birth weight from model selection process, we did not include these two variables here, since other levels of mrace and frace didn't show significant differences.
+Finally, we chose smoken, ppbmi, gaweeks, delwt, blength, bhead for our model. Although we see specific mother race and father race (mrace = 2 and frace = 4) also had significant influence on birth weight from model selection process, we did not include these two variables here, since other levels of mrace and frace didn't show significant differences (but we can surely stratify these two variables to fit the model).
 
 
 ```{r}
@@ -183,7 +183,7 @@ bw %>%
   add_residuals(bw_lm) %>% 
   add_predictions(bw_lm) %>% 
   ggplot(aes(x = pred, y = resid)) + 
-  geom_point() +
+  geom_point(alpha = 0.2) +
   labs(
      title = "Model residuals against fitted values",
      x = "Fitted values",
