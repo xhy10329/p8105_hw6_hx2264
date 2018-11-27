@@ -34,7 +34,7 @@ homic$hmc_resolve <- ifelse(homic$disposition == "Closed by arrest", 1, 0)
 ```{r}
 homic <- homic %>% 
   filter(!city_state %in% c("Dallas,TX","Phoenix,AZ", "Kansas City,MO", "Tulsa,AL")) %>%
-  filter(victim_race != "Unkonwn") %>% 
+  filter(victim_race != "Unknown") %>% 
   mutate(victim_race = fct_relevel(ifelse(victim_race == "White", "white", "non-white"), "white")) %>%
   mutate(victim_age = as.numeric(victim_age))
 ```
